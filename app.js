@@ -1,56 +1,57 @@
-// configurações bases 
-const express = require('express')
-const app = express()
+// ===== CONFIGURAÇÕES BÁSICAS =====
+const express = require('express');
+const app = express();
+const path = require('path');
+const bodyParser = require('body-parser');
 const methodOverride = require('method-override');
-const path = require('path'); //  NECESSÁRIO para configurar o caminho das views
-app.use(methodOverride('_method'));
-
-const pool = require('./database'); // banco de dados
-
 const session = require('express-session');
 
-app.use(session({
-    secret: 'chave_super_segura',
-    resave: false,
-    saveUninitialized: false
-}));
+const pool = require('./database'); // conexão local com o banco
 
-// Testar conexão
-pool.query('SELECT NOW()', (err, result) => {
-  if (err) {
-    console.error('❌ Erro ao conectar ao banco de dados:', err);
-  } else {
-    console.log('✅ Conexão com o banco de dados bem-sucedida!');
-    console.log('🕒 Hora atual do PostgreSQL:', result.rows[0].now);
-  }
-});
+const PORT = 3000;
 
-const port = 3000
-const bodyParser = require('body-parser');
-const { error } = require('console');
+// ===== MIDDLEWARES =====
+app.use(methodOverride('_method'));
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(express.json());
 
-//  CONFIGURAÇÃO DA VIEW ENGINE
-app.set('view engine', 'ejs')
-app.set('views', path.join(__dirname, 'views'));
-
-// TRATAMENTO DE FORMULÁRIOS
-app.use(bodyParser.urlencoded({ extended: true }))
-app.use(express.json())
-
-// LIBERAR ARQUIVOS ESTÁTICOS (IMAGENS, CSS, JS) 
+// arquivos estáticos
 app.use(express.static(path.join(__dirname, 'public')));
 
-// proteção de rota
+// ===== VIEW ENGINE =====
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
+
+// ===== SESSÃO =====
+app.use(session({
+  secret: 'chave_super_segura_local',
+  resave: false,
+  saveUninitialized: false
+}));
+
+// ===== TESTE DE CONEXÃO COM O BANCO =====
+pool.query('SELECT NOW()')
+  .then(result => {
+    console.log('✅ Conectado ao PostgreSQL');
+    console.log('🕒 Hora do banco:', result.rows[0].now);
+  })
+  .catch(err => {
+    console.error('❌ Erro ao conectar ao banco:', err.message);
+  });
+
+// ===== PROTEÇÃO DE ROTAS =====
 function protegerRota(req, res, next) {
-  if (req.session && req.session.logado) {
+  if (req.session.logado) {
     return next();
   }
   res.redirect('/');
 }
 
+// ===== ROTAS =====
+
 // LOGIN (tela)
 app.get('/', (req, res) => {
-  res.render('pages/form')
+  res.render('pages/form');
 });
 
 // LOGIN (verificação)
@@ -59,7 +60,7 @@ app.post('/login', async (req, res) => {
 
   try {
     const result = await pool.query(
-      'SELECT * FROM "login" WHERE email = $1 AND senha = $2',
+      'SELECT * FROM login WHERE email = $1 AND senha = $2',
       [email, senha]
     );
 
@@ -72,143 +73,133 @@ app.post('/login', async (req, res) => {
       erro: 'Usuário ou senha inválidos'
     });
 
-  } catch (erro) {
-    console.error("❌ ERRO NO LOGIN:", erro.message);
-    return res.status(500).send('Erro ao fazer login');
+  } catch (err) {
+    console.error('❌ Erro no login:', err.message);
+    res.status(500).send('Erro ao fazer login');
   }
 });
 
-
 // LOGOUT
 app.get('/logout', (req, res) => {
-  req.session.destroy();
-  res.redirect('/');
+  req.session.destroy(() => {
+    res.redirect('/');
+  });
 });
 
-// rotas protegidas
-
-// form
-app.get('/form', protegerRota, (req, res) => {
-  res.render('pages/form')
-})
-
-// home
+// HOME
 app.get('/home', protegerRota, (req, res) => {
-  res.render('pages/home')
-})
+  res.render('pages/home');
+});
 
-// cadastro
+// CADASTRO
 app.get('/cadastro', protegerRota, (req, res) => {
-  res.render('pages/cadastro')
-})
+  res.render('pages/cadastro');
+});
 
-// SALVAR OFÍCIO
+// ===== OFÍCIOS =====
+
+// SALVAR
 app.post('/salvar', protegerRota, async (req, res) => {
   const { nome, numero, data_emissao } = req.body;
 
   try {
     await pool.query(
-      'INSERT INTO oficio ( nome, numero, data_emissao) VALUES ($1,$2,$3)',
-      [ nome, numero, data_emissao]
+      'INSERT INTO oficio (nome, numero, data_emissao) VALUES ($1, $2, $3)',
+      [nome, numero, data_emissao]
     );
 
-    res.redirect('/lister')
-  }
-  catch (erro) {
-    console.error('Erro ao salvar oficio:', erro);
-    res.status(500).send('Erro ao salvar oficio');
+    res.redirect('/lister');
+  } catch (err) {
+    console.error('Erro ao salvar ofício:', err.message);
+    res.status(500).send('Erro ao salvar ofício');
   }
 });
 
-// LISTAR OFÍCIOS
+// LISTAR
 app.get('/lister', protegerRota, async (req, res) => {
-
   try {
-    const result = await pool.query('SELECT * FROM oficio ORDER BY CAST (numero AS INTEGER) DESC');
+    const result = await pool.query(
+      'SELECT * FROM oficio ORDER BY CAST(numero AS INTEGER) DESC'
+    );
+
     res.render('pages/lister', { oficios: result.rows });
-  }
-  catch (erro) {
-    console.error('Erro ao buscar oficios:', erro);
-    res.status(500).send('Erro ao buscar oficios');
+  } catch (err) {
+    console.error('Erro ao listar ofícios:', err.message);
+    res.status(500).send('Erro ao listar ofícios');
   }
 });
 
-// DELETAR OFÍCIO
+// DELETAR
 app.get('/oficio/:id', protegerRota, async (req, res) => {
   const { id } = req.params;
 
   try {
-    const result = await pool.query("DELETE FROM oficio WHERE id = $1", [id]);
-
-    if (result.rowCount === 0) {
-      return res.status(404).send('Oficio não encontrado');
-    }
-
+    await pool.query('DELETE FROM oficio WHERE id = $1', [id]);
     res.redirect('/lister');
-  } 
-  catch (erro) {
-    console.error('Erro ao deletar oficio:', erro);
-    res.status(500).send('Erro interno do servidor');
+  } catch (err) {
+    console.error('Erro ao deletar ofício:', err.message);
+    res.status(500).send('Erro ao deletar ofício');
   }
 });
 
-// rota de atualizar 
-app.post('/oficio/editar/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { nome, numero, data_emissao } = req.body;
+// ===== EDITAR (CARREGAR DADOS) =====
+app.get('/oficio/editar/:id', protegerRota, async (req, res) => {
+  const { id } = req.params;
 
-        // Buscar dados atuais
-        const atual = await pool.query(
-            'SELECT * FROM oficio WHERE id = $1',
-            [id]
-        );
+  try {
+    const result = await pool.query(
+      'SELECT * FROM oficio WHERE id = $1',
+      [id]
+    );
 
-        if (atual.rowCount === 0) {
-            return res.status(404).send("Ofício não encontrado");
-        }
-
-        const oficioAtual = atual.rows[0];
-
-        // Se o campo NÃO veio preenchido, manter o valor antigo
-        const novoNome = nome && nome.trim() !== '' ? nome : oficioAtual.nome;
-        const novoNumero = numero && numero.trim() !== '' ? numero : oficioAtual.numero;
-        const novaData = data_emissao && data_emissao !== '' ? data_emissao : oficioAtual.data_emissao;
-
-        // UPDATE final
-        await pool.query(
-            'UPDATE oficio SET nome = $1, numero = $2, data_emissao = $3 WHERE id = $4',
-            [novoNome, novoNumero, novaData, id]
-        );
-
-        res.redirect('/lister');
-
-    } catch (err) {
-        console.error("Erro ao atualizar:", err);
-        res.status(500).send("Erro ao atualizar");
+    if (result.rowCount === 0) {
+      return res.status(404).send('Ofício não encontrado');
     }
+
+    res.render('editar', { oficio: result.rows[0] });
+
+  } catch (err) {
+    console.error('Erro ao carregar edição:', err.message);
+    res.status(500).send('Erro ao carregar edição');
+  }
 });
 
-// rota de carregar dados para edição
-app.get('/oficio/editar/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
+// ===== EDITAR (ATUALIZAR) =====
+app.post('/oficio/editar/:id', protegerRota, async (req, res) => {
+  const { id } = req.params;
+  const { nome, numero, data_emissao } = req.body;
 
-        const result = await pool.query(
-            'SELECT * FROM oficio WHERE id = $1',
-            [id]
-        );
+  try {
+    // buscar dados atuais
+    const atual = await pool.query(
+      'SELECT * FROM oficio WHERE id = $1',
+      [id]
+    );
 
-        const oficio = result.rows[0];
-
-        res.render('editar', { oficio }); 
-    } catch (err) {
-        console.error(err);
-        res.status(500).send("Erro ao carregar edição");
+    if (atual.rowCount === 0) {
+      return res.status(404).send('Ofício não encontrado');
     }
+
+    const oficioAtual = atual.rows[0];
+
+    const novoNome   = nome && nome.trim() !== '' ? nome : oficioAtual.nome;
+    const novoNumero = numero && numero.trim() !== '' ? numero : oficioAtual.numero;
+    const novaData   = data_emissao && data_emissao !== '' ? data_emissao : oficioAtual.data_emissao;
+
+    await pool.query(
+      'UPDATE oficio SET nome = $1, numero = $2, data_emissao = $3 WHERE id = $4',
+      [novoNome, novoNumero, novaData, id]
+    );
+
+    res.redirect('/lister');
+
+  } catch (err) {
+    console.error('Erro ao atualizar ofício:', err.message);
+    res.status(500).send('Erro ao atualizar ofício');
+  }
 });
 
-// servidor
-app.listen(port, () => {
-  console.log(`Servidor rodando na porta ${port}`)
+// ===== SERVIDOR =====
+app.listen(PORT, () => {
+  console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
 });
