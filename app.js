@@ -26,7 +26,8 @@ pool.query('SELECT NOW()', (err, result) => {
 });
 
 const port = 3000
-const bodyParser = require('body-parser')
+const bodyParser = require('body-parser');
+const { error } = require('console');
 
 //  CONFIGURAÇÃO DA VIEW ENGINE
 app.set('view engine', 'ejs')
@@ -58,7 +59,7 @@ app.post('/login', async (req, res) => {
 
   try {
     const result = await pool.query(
-      'SELECT * FROM login WHERE email = $1 AND senha = $2',
+      'SELECT * FROM "login" WHERE email = $1 AND senha = $2',
       [email, senha]
     );
 
@@ -67,13 +68,16 @@ app.post('/login', async (req, res) => {
       return res.redirect('/home');
     }
 
-    console.log("Usuário ou senha inválidos");
+    return res.render('pages/form', {
+      erro: 'Usuário ou senha inválidos'
+    });
 
   } catch (erro) {
-    console.error("Erro ao fazer login:", erro);
-    res.status(500).send('Erro ao fazer login');
+    console.error("❌ ERRO NO LOGIN:", erro.message);
+    return res.status(500).send('Erro ao fazer login');
   }
 });
+
 
 // LOGOUT
 app.get('/logout', (req, res) => {
