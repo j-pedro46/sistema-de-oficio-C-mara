@@ -1,4 +1,4 @@
-// ===== CONFIGURAÇÕES BÁSICAS =====
+//CONFIGURAÇÕES BÁSICAS
 const express = require('express');
 const app = express();
 const path = require('path');
@@ -10,7 +10,7 @@ const pool = require('./database'); // conexão local com o banco
 
 const PORT = 3000;
 
-// ===== MIDDLEWARES =====
+//  MIDDLEWARES
 app.use(methodOverride('_method'));
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.json());
@@ -18,18 +18,18 @@ app.use(express.json());
 // arquivos estáticos
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ===== VIEW ENGINE =====
+//VIEW ENGINE
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 
-// ===== SESSÃO =====
+//SESSÃO
 app.use(session({
   secret: 'chave_super_segura_local',
   resave: false,
   saveUninitialized: false
 }));
 
-// ===== TESTE DE CONEXÃO COM O BANCO =====
+// TESTE DE CONEXÃO COM O BANCO
 pool.query('SELECT NOW()')
   .then(result => {
     console.log('✅ Conectado ao PostgreSQL');
@@ -39,7 +39,7 @@ pool.query('SELECT NOW()')
     console.error('❌ Erro ao conectar ao banco:', err.message);
   });
 
-// ===== PROTEÇÃO DE ROTAS =====
+// PROTEÇÃO DE ROTAS
 function protegerRota(req, res, next) {
   if (req.session.logado) {
     return next();
@@ -47,7 +47,7 @@ function protegerRota(req, res, next) {
   res.redirect('/');
 }
 
-// ===== ROTAS =====
+//ROTAS
 
 // LOGIN (tela)
 app.get('/', (req, res) => {
@@ -96,8 +96,6 @@ app.get('/cadastro', protegerRota, (req, res) => {
   res.render('pages/cadastro');
 });
 
-// ===== OFÍCIOS =====
-
 // SALVAR
 app.post('/salvar', protegerRota, async (req, res) => {
   const { nome, numero, data_emissao } = req.body;
@@ -142,7 +140,7 @@ app.get('/oficio/:id', protegerRota, async (req, res) => {
   }
 });
 
-// ===== EDITAR (CARREGAR DADOS) =====
+//CARREGAR DADOS
 app.get('/oficio/editar/:id', protegerRota, async (req, res) => {
   const { id } = req.params;
 
@@ -199,7 +197,7 @@ app.post('/oficio/editar/:id', protegerRota, async (req, res) => {
   }
 });
 
-// ===== SERVIDOR =====
+// SERVIDOR
 app.listen(PORT, () => {
   console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
 });
