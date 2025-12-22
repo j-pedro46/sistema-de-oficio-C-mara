@@ -8,7 +8,7 @@ const session = require('express-session');
 
 const pool = require('./database'); // conexão local com o banco
 
-const PORT = 3000;
+const PORT =process.env.PORT || 3000;
 
 //  MIDDLEWARES
 app.use(methodOverride('_method'));
