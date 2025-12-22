@@ -52,6 +52,7 @@ function protegerRota(req, res, next) {
 // LOGIN (tela)
 app.get('/', (req, res) => {
   res.render('pages/form');
+  console.log('Acessou a página de login');
 });
 
 // LOGIN (verificação)
