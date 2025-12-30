@@ -8,7 +8,7 @@ const session = require('express-session');
 
 const pool = require('./database'); // conexão local com o banco
 
-const PORT =process.env.PORT || 3000;
+const PORT = 3000;
 
 //  MIDDLEWARES
 app.use(methodOverride('_method'));
@@ -24,7 +24,7 @@ app.set('views', path.join(__dirname, 'views'));
 
 //SESSÃO
 app.use(session({
-  secret: 'chave_super_segura_local',
+  secret: process.env.SESSION_SECRET || 'chave_super_segura_local',
   resave: false,
   saveUninitialized: false
 }));
@@ -155,7 +155,7 @@ app.get('/oficio/editar/:id', protegerRota, async (req, res) => {
       return res.status(404).send('Ofício não encontrado');
     }
 
-    res.render('editar', { oficio: result.rows[0] });
+    res.render('pages/editar', { oficio: result.rows[0] });
 
   } catch (err) {
     console.error('Erro ao carregar edição:', err.message);
@@ -199,6 +199,12 @@ app.post('/oficio/editar/:id', protegerRota, async (req, res) => {
 });
 
 // SERVIDOR
-app.listen(PORT, () => {
-  console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
-});
+// Para desenvolvimento local
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
+  });
+}
+
+// Para Vercel (serverless function)
+module.exports = app;

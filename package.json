@@ -2,7 +2,6 @@
   "name": "promissoria",
   "version": "1.0.0",
   "main": "index.js", 
-  "type": "module",
   "node": "14.x",
   "scripts": {
     "start": "node app.js",
